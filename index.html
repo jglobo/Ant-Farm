@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ANT FARM — Pixel Colony Sim</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game" width="480" height="288"></canvas>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+
+    <!-- ===== TOP HUD ===== -->
+    <div id="hud" class="hidden">
+      <div class="hud-group">
+        <span class="stat food" data-tip="FOOD|Stored in the granary. Eggs cost 2; healing costs 3 for 2 HP."><i></i><b id="s-food">0</b> FOOD</span>
+        <span class="stat egg" data-tip="EGGS|Eggs waiting to hatch (6 at most). Nurses make them hatch sooner."><i></i><b id="s-eggs">0</b> EGGS</span>
+        <span class="stat queen" data-tip="QUEEN|Her health. If it reaches zero the colony is lost."><i></i><b id="s-qhp">100</b>%</span>
+      </div>
+      <div class="hud-group" id="s-ants">
+        <span class="chip g" data-tip="GATHERERS|Fetch food and building material from the surface."><i></i><b id="s-gatherer">0</b></span>
+        <span class="chip b" data-tip="BUILDERS|Dig, dam the rain, wall off raiders and make repairs."><i></i><b id="s-builder">0</b></span>
+        <span class="chip n" data-tip="NURSES|Tend the eggs so they hatch sooner."><i></i><b id="s-nurse">0</b></span>
+        <span class="chip a" data-tip="SOLDIERS|Guard the queen. 10 HP, 3 damage per bite."><i></i><b id="s-army">0</b></span>
+        <span class="chip e" data-tip="ENEMIES|Raiders, thieves and brutes inside your territory."><i></i><b id="s-enemy">0</b></span>
+      </div>
+      <div class="hud-group right">
+        <span class="clock" id="s-clock" data-tip="TIME|A day lasts 150 seconds. Food grows more slowly at night.">DAY 1 06:00</span>
+        <span class="next" id="s-next" data-tip="NEXT EVENT|What the sky has in store, and when.">NEXT: -</span>
+      </div>
+    </div>
+
+    <!-- ===== EVENT BANNER ===== -->
+    <div id="banner" class="hidden"><b id="banner-title"></b><span id="banner-sub"></span></div>
+
+    <!-- ===== TOAST + PLACEMENT HINT ===== -->
+    <div id="toast" class="hidden"></div>
+    <div id="hint" class="hidden">CLICK DEEP DIRT TO PLACE THE QUEEN</div>
+
+    <!-- ===== BOTTOM BAR ===== -->
+    <div id="dock" class="hidden">
+      <button data-act="pause" id="b-pause" data-tip="MENU|Pause and open the menu (Space / Esc)">II</button>
+      <button data-act="speed" id="b-speed" data-tip="SPEED|Game speed (1 / 2 / 3)">1X</button>
+      <button data-act="zoom-out" data-tip="ZOOM OUT|Mouse wheel or the - key">&minus;</button>
+      <button data-act="zoom-in" data-tip="ZOOM IN|Mouse wheel or the + key">+</button>
+      <button data-act="follow" id="b-follow" data-tip="FOLLOW QUEEN|Keep the camera on her (F)">QUEEN</button>
+      <button data-act="defend" id="b-defend" class="defend" data-tip="DEFEND|Call every ant back to guard the queen (G). They return to work when the raid is over.">DEFEND</button>
+      <button data-act="layers" id="b-layers" data-tip="OVERLAY|Cycle jobs, threats and economy (V)">VIEW</button>
+      <button data-act="index" data-tip="COLONY INDEX|Every ant, block and item (I)">INDEX</button>
+      <span class="spacer"></span>
+      <span id="zoom-label" data-tip="ZOOM|Current zoom level">1X</span>
+    </div>
+
+    <!-- ===== SELECTION PANEL ===== -->
+    <div id="inspect" class="panel hidden">
+      <div class="p-title"><b id="i-name">—</b><button data-act="close-inspect" data-tip="CLOSE|Stop following this ant (Esc)">X</button></div>
+      <div class="p-body" id="i-body"></div>
+    </div>
+
+    <!-- ===== LAY EGG PROMPT ===== -->
+    <div id="lay" class="modal hidden">
+      <div class="m-card">
+        <h2>THE QUEEN IS READY</h2>
+        <p class="m-sub">Choose the brood she will tend. Cost: <b id="lay-cost">2 food</b></p>
+        <div class="choices">
+          <button class="ch" data-lay="gatherer"><canvas class="ico" data-sprite="gatherer"></canvas><b>GATHERER</b><em>Forages food &amp; twigs</em><kbd>1</kbd></button>
+          <button class="ch" data-lay="builder"><canvas class="ico" data-sprite="builder"></canvas><b>BUILDER</b><em>Digs, dams &amp; repairs</em><kbd>2</kbd></button>
+          <button class="ch" data-lay="nurse"><canvas class="ico" data-sprite="nurse"></canvas><b>NURSE</b><em>Hatches eggs faster</em><kbd>3</kbd></button>
+          <button class="ch" data-lay="army"><canvas class="ico" data-sprite="army"></canvas><b>SOLDIER</b><em>Guards the queen (10 HP)</em><kbd>4</kbd></button>
+        </div>
+        <button class="wait" data-act="wait">HOLD THE EGG</button>
+      </div>
+    </div>
+
+    <!-- ===== PAUSE MENU (three pages) ===== -->
+    <div id="pause" class="modal hidden">
+      <!-- page 1: the menu -->
+      <div class="m-card menu" id="page-menu">
+        <h2>PAUSED</h2>
+        <p class="m-sub" id="pause-sub">DAY 1</p>
+        <div class="menu-list">
+          <button class="mbtn primary" data-act="resume">RESUME<small>Space / Esc</small></button>
+          <button class="mbtn" data-act="index">COLONY INDEX<small>Every ant, block and item</small></button>
+          <button class="mbtn" data-act="help">HANDBOOK<small>How the colony works</small></button>
+          <button class="mbtn" data-act="save">SAVE COLONY<small>Also autosaves every 90s</small></button>
+          <button class="mbtn danger" data-act="reset">NEW COLONY<small>Abandon this one</small></button>
+        </div>
+      </div>
+
+      <!-- page 2: the colony index -->
+      <div class="m-card book hidden" id="page-index">
+        <div class="book-head">
+          <button class="back" data-act="back">&larr; BACK</button>
+          <h2>COLONY INDEX</h2>
+          <span></span>
+        </div>
+        <div class="tabs" id="index-tabs">
+          <button data-tab="ants" class="on">ANTS</button>
+          <button data-tab="blocks">BLOCKS</button>
+          <button data-tab="items">ITEMS</button>
+          <button data-tab="events">EVENTS</button>
+        </div>
+        <div class="entries" id="index-entries"></div>
+      </div>
+
+      <!-- page 3: the handbook -->
+      <div class="m-card book hidden" id="page-help">
+        <div class="book-head">
+          <button class="back" data-act="back">&larr; BACK</button>
+          <h2>COLONY HANDBOOK</h2>
+          <span></span>
+        </div>
+        <div class="cols">
+          <section>
+            <h3>GOAL</h3>
+            <p>You only pick where the <b>Queen</b> sleeps and what she lays. Everything else is the colony working on its own. Keep her alive and the colony grows forever.</p>
+            <h3>CONTROLS</h3>
+            <p><kbd>Click</kbd> place queen, select an ant, or order a builder<br/>
+            <kbd>Drag</kbd> / <kbd>WASD</kbd> pan &middot; <kbd>Wheel</kbd> / <kbd>+</kbd> <kbd>&minus;</kbd> zoom<br/>
+            <kbd>Space</kbd> / <kbd>Esc</kbd> menu &middot; <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed<br/>
+            <kbd>G</kbd> defend &middot; <kbd>F</kbd> follow queen &middot; <kbd>V</kbd> overlay &middot; <kbd>I</kbd> index<br/>
+            Hover over anything to see what it is.</p>
+          </section>
+          <section>
+            <h3>FIGHTING</h3>
+            <p>Everyone bites once a second. <b class="g">Workers</b> bite back for <b>1</b>, <b class="army">soldiers</b> for <b>3</b>, the <b class="q">queen</b> for <b>5</b>. Enemies bite for <b>2</b>.<br/>
+            Press <b>DEFEND</b> when raiders come: every ant drops its work and rallies round the queen, then goes back to work once the raid is over.</p>
+            <h3>THREATS</h3>
+            <p>Rain floods the shafts &mdash; builders dam it. Sandstorms bury tunnels. Injured ants eat food to heal.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== GAME OVER ===== -->
+    <div id="over" class="modal hidden">
+      <div class="m-card">
+        <h2 class="red">THE QUEEN HAS FALLEN</h2>
+        <p class="m-sub" id="over-sub">DAY 1 &mdash; THE TUNNELS GO QUIET</p>
+        <div class="over-stats" id="over-stats"></div>
+        <button class="mbtn primary" data-act="restart">DIG A NEW COLONY<small>R / Enter</small></button>
+      </div>
+    </div>
+
+    <!-- ===== TITLE ===== -->
+    <div id="title">
+      <div class="t-card">
+        <h1>ANT<span>FARM</span></h1>
+        <p class="tag">A tiny pixel colony that digs, builds and fights without you.</p>
+        <ul class="t-steps">
+          <li><b>1</b> Place your <b>Queen</b> deep in the dirt</li>
+          <li><b>2</b> She will ask what to lay &mdash; pick the brood</li>
+          <li><b>3</b> Keep her breathing</li>
+        </ul>
+        <button id="begin">DIG IN</button>
+        <small id="t-seed">SEED —</small>
+      </div>
+    </div>
+
+    <!-- ===== TOOLTIP ===== -->
+    <div id="tip" class="hidden"></div>
+  </div>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/pixel.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/ants.js"></script>
+<script src="js/events.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
